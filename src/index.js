@@ -1,261 +1,115 @@
-/* eslint-disable no-useless-escape */
-const inNumber = /^[0-9.]+$/;
-const inPhone = /^[\+]?[(]?[0-9]{3}[)]?[-\s\.]?[0-9]{3}[-\s\.]?[0-9]{4,6}$/im;
-const inMail = /^(([^<>()[\]\\.,;:\s@\"]+(\.[^<>()[\]\\.,;:\s@\"]+)*)|(\".+\"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
+/* eslint-disable no-restricted-globals */
+import {
+  inGeolocation,
+  inString,
+  inNumber,
+  inImage,
+  inEmail,
+  inPhone
+} from "./functions";
 
-const Index = (data = {}, need = {}) => {
-  let fail = 0;
-  const fixData = data;
-  Object.keys(fixData).forEach(key => {
-    Object.keys(need).forEach(validate => {
-      if (key === validate) {
-        let hasFalse = 0;
-        if (need[validate].type === "geolocation") {
-          const locater = () => {
-            if (fixData[key].val.lat === 0 && fixData[key].val.lon === 0) {
-              fail += 1;
-              fixData[key].alert = {
-                enabled: true,
-                message: "Location is not valid"
-              };
-              hasFalse += 1;
-            }
-          };
-
-          if (need[validate].required) {
-            if (!fixData[key].val) {
-              fail += 1;
-              fixData[key].alert = {
-                enabled: true,
-                message: "Please insert location"
-              };
-              hasFalse += 1;
-            } else {
-              locater();
-            }
-          } else if (fixData[key].val) {
-            locater();
-          }
-        }
-
-        if (need[validate].type === "image") {
-          const imager = () => {
-            const file = fixData[key].val;
-            let FileName = file.name;
-
-            const FileMime = FileName.substring(
-              FileName.lastIndexOf(".") + 1
-            ).toLowerCase();
-            const FileSize = file.size;
-            if (file) {
-              FileName = FileName.replace(`.${FileMime}`, "");
-              // 50000 == 50kB
-              if (
-                FileMime === "png" ||
-                FileMime === "jpeg" ||
-                FileMime === "jpg"
-              ) {
-                if (
-                  need[validate].max_kb &&
-                  FileSize >= need[validate].max_kb * 1000
-                ) {
-                  fail += 1;
-                  fixData[key].alert = {
-                    enabled: true,
-                    message: `Image file not greater than of ${need[validate].max_kb} kb`
-                  };
-                  hasFalse += 1;
-                }
-              } else {
+export default (data = {}, need = {}, state = { formName: "", self }) => {
+  return new Promise((res, rej) => {
+    const run = async () => {
+      let fail = 0;
+      const fixData = data;
+      let response = {};
+      const promise1 = Object.keys(fixData).map(async key => {
+        const promise2 = Object.keys(need).map(async validate => {
+          if (key === validate) {
+            if (need[validate].type === "geolocation") {
+              try {
+                await inGeolocation(need[validate], data, key, state);
+              } catch (e) {
                 fail += 1;
-                fixData[key].alert = {
-                  enabled: true,
-                  message: "Only image file are allowed."
+                response = {
+                  ...response,
+                  [key]: e
                 };
-                hasFalse += 1;
               }
             }
-          };
 
-          if (need[validate].required) {
-            if (!fixData[key].val) {
-              fail += 1;
-              fixData[key].alert = {
-                enabled: true,
-                message: "Please upload an image file"
-              };
-              hasFalse += 1;
-            } else {
-              imager();
-            }
-          } else if (fixData[key].val) {
-            imager();
-          }
-        }
-
-        if (need[validate].type === "string") {
-          if (need[validate].required) {
-            if (!fixData[key].val) {
-              fail += 1;
-              fixData[key].alert = {
-                enabled: true,
-                message: "Please insert this field"
-              };
-              hasFalse += 1;
-            }
-
-            if (need[validate].min !== "" && need[validate].min != null) {
-              if (fixData[key].val.length < need[validate].min) {
+            if (need[validate].type === "image") {
+              try {
+                await inImage(need[validate], data, key, state);
+              } catch (e) {
                 fail += 1;
-                fixData[key].alert = {
-                  enabled: true,
-                  message: `Not less than of ${need[validate].min} characters`
+                response = {
+                  ...response,
+                  [key]: e
                 };
-                hasFalse += 1;
               }
             }
 
-            if (need[validate].max !== "" && need[validate].max != null) {
-              if (fixData[key].val.length > need[validate].max) {
+            if (need[validate].type === "string") {
+              try {
+                await inString(need[validate], data, key, state);
+              } catch (e) {
                 fail += 1;
-                fixData[key].alert = {
-                  enabled: true,
-                  message: `Not greater than of ${need[validate].max} characters`
+                response = {
+                  ...response,
+                  [key]: e
                 };
-                hasFalse += 1;
               }
             }
-          }
-        }
 
-        if (need[validate].type === "number") {
-          const numberer = () => {
-            if (typeof fixData[key].val !== "number") {
-              if (!fixData[key].val.match(inNumber)) {
+            if (need[validate].type === "number") {
+              try {
+                await inNumber(need[validate], data, key, state);
+              } catch (e) {
                 fail += 1;
-                fixData[key].alert = {
-                  enabled: true,
-                  message: "Only number types are allowed"
+                response = {
+                  ...response,
+                  [key]: e
                 };
-                hasFalse += 1;
-              }
-
-              if (need[validate].min !== "" && need[validate].min != null) {
-                if (fixData[key].val < need[validate].min) {
-                  fail += 1;
-                  fixData[key].alert = {
-                    enabled: true,
-                    message: `Not less than of ${need[validate].min}`
-                  };
-                  hasFalse += 1;
-                }
               }
             }
 
-            if (need[validate].max !== "" && need[validate].max != null) {
-              if (fixData[key].val > need[validate].max) {
+            if (need[validate].type === "phone") {
+              try {
+                await inPhone(need[validate], data, key, state);
+              } catch (e) {
                 fail += 1;
-                fixData[key].alert = {
-                  enabled: true,
-                  message: `Not greater than of ${need[validate].max}`
+                response = {
+                  ...response,
+                  [key]: e
                 };
-                hasFalse += 1;
               }
             }
-          };
 
-          if (need[validate].required) {
-            if (!fixData[key].val) {
-              fail += 1;
-              fixData[key].alert = {
-                enabled: true,
-                message: "Please insert this field"
-              };
-              hasFalse += 1;
-            } else {
-              numberer();
+            if (need[validate].type === "email") {
+              try {
+                await inEmail(need[validate], data, key, state);
+              } catch (e) {
+                fail += 1;
+                response = {
+                  ...response,
+                  [key]: e
+                };
+              }
             }
-          } else if (fixData[key].val) {
-            numberer();
           }
-        }
+        });
 
-        if (need[validate].type === "phone") {
-          const phoner = () => {
-            if (!inPhone.test(fixData[key].val)) {
-              fail += 1;
-              fixData[key].alert = {
-                enabled: true,
-                message: "Phone number format is invalid"
-              };
-              hasFalse += 1;
-            }
-          };
+        await Promise.all(promise2);
+      });
 
-          if (need[validate].required) {
-            if (!fixData[key].val) {
-              fail += 1;
-              fixData[key].alert = {
-                enabled: true,
-                message: "Please insert a phone number"
-              };
-              hasFalse += 1;
-            } else {
-              phoner();
-            }
-          } else if (fixData[key].val) {
-            phoner();
-          }
-        }
+      await Promise.all(promise1);
 
-        if (need[validate].type === "email") {
-          const mailer = () => {
-            if (!inMail.test(fixData[key].val)) {
-              fail += 1;
-              fixData[key].alert = {
-                enabled: true,
-                message: "Email address format is invalid"
-              };
-              hasFalse += 1;
-            }
-          };
+      if (fail >= 1) {
+        const err = {
+          status: false,
+          output: response
+        };
 
-          if (need[validate].required) {
-            if (!fixData[key].val) {
-              fail += 1;
-              fixData[key].alert = {
-                enabled: true,
-                message: "Please insert an email"
-              };
-              hasFalse += 1;
-            } else {
-              mailer();
-            }
-          } else if (fixData[key].val) {
-            mailer();
-          }
-        }
-
-        if (!hasFalse) {
-          fixData[key].alert = {
-            enabled: false,
-            message: ""
-          };
-        }
+        rej(err);
       }
-    });
-  });
 
-  if (fail >= 1) {
-    return {
-      status: false,
-      output: fixData
+      res({
+        status: true
+      });
     };
-  }
 
-  return {
-    status: true
-  };
+    run();
+  });
 };
-
-export default Index;
